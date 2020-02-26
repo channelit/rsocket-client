@@ -25,4 +25,12 @@ public class RSocketController {
                 .retrieveFlux(Message.class);
     }
 
+    @GetMapping(value = "/camel/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Publisher<Message> getCamelMessages(@PathVariable String filter) {
+        return rSocketRequester
+                .route("camel/" + filter)
+                .data(filter)
+                .retrieveFlux(Message.class);
+    }
+
 }
