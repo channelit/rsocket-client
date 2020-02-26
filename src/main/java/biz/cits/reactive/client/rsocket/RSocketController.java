@@ -20,8 +20,8 @@ public class RSocketController {
     @GetMapping(value = "/messages/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Publisher<Message> getMessages(@PathVariable String filter) {
         return rSocketRequester
-                .route("messages")
-                .data(new Message(filter))
+                .route("messages/" + filter)
+                .data(filter)
                 .retrieveFlux(Message.class);
     }
 
