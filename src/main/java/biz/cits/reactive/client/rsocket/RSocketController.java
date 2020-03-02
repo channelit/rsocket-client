@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 
 @RestController
@@ -43,7 +42,7 @@ public class RSocketController {
         Message m = new Message(MsgGenerator.getMessages(1).get(0).getValue());
         System.out.println(m);
         return rSocketRequester
-                .route("post")
+                .route("post/me")
                 .data(m).retrieveMono(String.class);
     }
 
@@ -54,7 +53,7 @@ public class RSocketController {
                     messageFluxSink.next(new Message(m.getValue()));
                 }));
         return rSocketRequester
-                .route("posts")
+                .route("posts/me")
                 .data(messages)
                 .retrieveFlux(Message.class);
     }
