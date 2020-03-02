@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 
 @RestController
@@ -37,18 +39,24 @@ public class RSocketController {
     }
 
     @GetMapping(value = "/post", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Mono<String> getMessages(@RequestParam int numMessages) {
+    public Mono<String> postMessags() {
         Message m = new Message(MsgGenerator.getMessages(1).get(0).getValue());
         System.out.println(m);
         return rSocketRequester
                 .route("post")
                 .data(m).retrieveMono(String.class);
-//        MsgGenerator.getMessages(numMessages).forEach(m -> {
-//            System.out.println(m);
-//            rSocketRequester
-//                    .route("post/me")
-//                    .data(m).send().block();
-//        });
+    }
+
+    @GetMapping(value = "/posts", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Publisher<Message> postMessages(@RequestParam int num) {
+        Flux<Message> messages = Flux.create(messageFluxSink ->
+                MsgGenerator.getMessages(num).forEach(m -> {
+                    messageFluxSink.next(new Message(m.getValue()));
+                }));
+        return rSocketRequester
+                .route("posts")
+                .data(messages)
+                .retrieveFlux(Message.class);
     }
 
 }
