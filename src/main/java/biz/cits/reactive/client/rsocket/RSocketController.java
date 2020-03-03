@@ -37,6 +37,14 @@ public class RSocketController {
                 .retrieveFlux(Message.class);
     }
 
+    @GetMapping(value = "/replay/{client}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Publisher<Message> replay(@PathVariable String client) {
+        return rSocketRequester
+                .route("replay/" + client)
+                .data(client)
+                .retrieveFlux(Message.class);
+    }
+
     @GetMapping(value = "/post", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Mono<String> postMessags() {
         Message m = new Message(MsgGenerator.getMessages(1).get(0).getValue());
