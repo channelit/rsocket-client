@@ -3,6 +3,7 @@ package biz.cits.reactive.client.rsocket;
 import io.rsocket.RSocket;
 import io.rsocket.RSocketFactory;
 import io.rsocket.frame.decoder.PayloadDecoder;
+import io.rsocket.metadata.WellKnownMimeType;
 import io.rsocket.transport.netty.client.TcpClientTransport;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -10,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.codec.CharSequenceEncoder;
 import org.springframework.core.codec.StringDecoder;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.http.MediaType;
 import org.springframework.messaging.rsocket.MetadataExtractor;
 import org.springframework.messaging.rsocket.RSocketRequester;
 import org.springframework.messaging.rsocket.RSocketStrategies;
@@ -26,7 +28,8 @@ public class RSocketConfig {
     RSocket rSocket() {
         return RSocketFactory
                 .connect()
-                .dataMimeType(MimeTypeUtils.APPLICATION_JSON_VALUE)
+//                .dataMimeType(MimeTypeUtils.APPLICATION_JSON_VALUE)
+                .mimeType(WellKnownMimeType.MESSAGE_RSOCKET_ROUTING.toString(), String.valueOf(MediaType.APPLICATION_CBOR))
                 .frameDecoder(PayloadDecoder.ZERO_COPY)
                 .transport(TcpClientTransport.create("localhost", 7000))
                 .start()
@@ -34,9 +37,9 @@ public class RSocketConfig {
     }
 
 //    @Bean
-//    RSocketStrategies rsocketStrategies() {
+//    RSocketStrategies strategies() {
 //        return RSocketStrategies.builder()
-//                .decoder(StringDecoder.allMimeTypes())
+//                .decoder(StringDecoder.textPlainOnly())
 //                .encoder(CharSequenceEncoder.allMimeTypes())
 //                .dataBufferFactory(new DefaultDataBufferFactory(true))
 //                .build();
