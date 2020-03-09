@@ -69,7 +69,7 @@ public class RSocketController {
                 MsgGenerator.getMessages(num).forEach(message -> {
                     ClientMessage clientMessage = ClientMessage.builder()
                             .client(message.getKey())
-                            .id(UUID.randomUUID())
+                            .id(UUID.randomUUID().toString())
                             .content(message.getValue())
                             .messageDateTime(Instant.now()).build();
                     messageFluxSink.next(clientMessage);
