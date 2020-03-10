@@ -42,6 +42,14 @@ public class RSocketController {
                 .retrieveFlux(ClientMessage.class);
     }
 
+    @GetMapping(value = "/camel-durable/{client}/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Publisher<ClientMessage> getCamelDurableMessages(@PathVariable String client, @PathVariable String filter) {
+        return rSocketRequester
+                .route("camel-durable/" + client + "/" + filter)
+                .data(filter)
+                .retrieveFlux(ClientMessage.class);
+    }
+
     @GetMapping(value = "/replay/{client}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Publisher<ClientMessage> replay(@PathVariable String client) {
         return rSocketRequester
