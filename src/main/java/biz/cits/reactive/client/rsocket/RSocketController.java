@@ -65,6 +65,14 @@ public class RSocketController {
                 .retrieveFlux(ClientMessage.class);
     }
 
+    @GetMapping(value = "/camel-virtual-direct/{client}/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Publisher<ClientMessage> getCamelVirtualDirectMessages(@PathVariable String client, @PathVariable String filter) {
+        return rSocketRequester
+                .route("camel-virtual-direct/" + client + "/" + filter)
+                .data(filter)
+                .retrieveFlux(ClientMessage.class);
+    }
+
     @GetMapping(value = "/replay/{client}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Publisher<ClientMessage> replay(@PathVariable String client) {
         return rSocketRequester
