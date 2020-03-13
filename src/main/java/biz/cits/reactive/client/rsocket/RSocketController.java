@@ -50,6 +50,21 @@ public class RSocketController {
                 .retrieveFlux(ClientMessage.class);
     }
 
+    @GetMapping(value = "/camel-durable-direct/{client}/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Publisher<ClientMessage> getCamelDurableDirectMessages(@PathVariable String client, @PathVariable String filter) {
+        return rSocketRequester
+                .route("camel-durable-direct/" + client + "/" + filter)
+                .data(filter)
+                .retrieveFlux(ClientMessage.class);
+    }
+    @GetMapping(value = "/camel-virtual/{client}/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Publisher<ClientMessage> getCamelVirtualMessages(@PathVariable String client, @PathVariable String filter) {
+        return rSocketRequester
+                .route("camel-virtual/" + client + "/" + filter)
+                .data(filter)
+                .retrieveFlux(ClientMessage.class);
+    }
+
     @GetMapping(value = "/replay/{client}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Publisher<ClientMessage> replay(@PathVariable String client) {
         return rSocketRequester
