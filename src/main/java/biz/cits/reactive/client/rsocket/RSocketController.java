@@ -7,6 +7,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.reactivestreams.Publisher;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.messaging.rsocket.RSocketRequester;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
+@Order(1)
 public class RSocketController {
 
     private final RSocketRequester rSocketRequester;

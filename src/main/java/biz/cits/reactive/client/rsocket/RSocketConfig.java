@@ -17,18 +17,19 @@ import org.springframework.messaging.rsocket.RSocketRequester;
 import org.springframework.messaging.rsocket.RSocketStrategies;
 import org.springframework.util.MimeTypeUtils;
 
+import java.time.Duration;
+
 @Configuration
 public class RSocketConfig {
 
     @Autowired
     private RSocketRequester.Builder builder;
-
+    static final Duration RESUME_SESSION_DURATION = Duration.ofSeconds(60);
 
     @Bean
     RSocket rSocket() {
         return RSocketFactory
                 .connect()
-//                .dataMimeType(MimeTypeUtils.APPLICATION_JSON_VALUE)
                 .mimeType(WellKnownMimeType.MESSAGE_RSOCKET_ROUTING.toString(), String.valueOf(MediaType.APPLICATION_CBOR))
                 .frameDecoder(PayloadDecoder.ZERO_COPY)
                 .transport(TcpClientTransport.create("localhost", 7000))
