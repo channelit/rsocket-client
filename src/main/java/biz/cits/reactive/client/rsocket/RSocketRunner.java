@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @Order(3)
-@EnableScheduling
+//@EnableScheduling
 public class RSocketRunner {
 
     final RSocketRequester rSocketRequester;
