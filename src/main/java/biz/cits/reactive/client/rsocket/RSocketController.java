@@ -95,8 +95,7 @@ public class RSocketController {
                 .id(UUID.randomUUID())
                 .content(message.getValue())
                 .messageDateTime(Instant.now()).build();
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.registerModule(new JavaTimeModule());
+        ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
         String jsonString = "";
         try {
             jsonString = mapper.writeValueAsString(m);
