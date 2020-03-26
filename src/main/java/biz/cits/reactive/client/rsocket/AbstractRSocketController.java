@@ -10,20 +10,22 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
-@RestController
+import java.lang.reflect.ParameterizedType;
+
 public abstract class AbstractRSocketController<T> {
-    Class<T> tClass;
+
+    private final Class<T> tClass;
 
     private final RSocketRequester rSocketRequester;
 
     ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
 
-    public AbstractRSocketController(RSocketRequester rSocketRequester) {
+    public AbstractRSocketController(T t, RSocketRequester rSocketRequester) {
+        this.tClass = (Class<T>) t.getClass();
         this.rSocketRequester = rSocketRequester;
     }
 
-    @GetMapping(value = "/typed-messages/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<T> getMessages(@PathVariable String filter) {
         ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
         return rSocketRequester
