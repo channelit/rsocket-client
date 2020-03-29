@@ -5,6 +5,7 @@ import biz.cits.reactive.model.Message;
 import biz.cits.reactive.model.MsgGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.reactivestreams.Publisher;
 import org.springframework.core.annotation.Order;
@@ -26,6 +27,7 @@ import java.util.UUID;
 public class RSocketController {
 
     private final RSocketRequester rSocketRequester;
+    private ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule()).configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
 
     public RSocketController(RSocketRequester rSocketRequester) {
         this.rSocketRequester = rSocketRequester;
@@ -95,7 +97,6 @@ public class RSocketController {
                 .id(UUID.randomUUID())
                 .content(message.getValue())
                 .messageDateTime(Instant.now()).build();
-        ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
         String jsonString = "";
         try {
             jsonString = mapper.writeValueAsString(m);
@@ -117,8 +118,6 @@ public class RSocketController {
                             .id(UUID.randomUUID().toString())
                             .content(message.getValue())
                             .messageDateTime(Instant.now()).build();
-                    ObjectMapper mapper = new ObjectMapper();
-                    mapper.registerModule(new JavaTimeModule());
                     String jsonString = "";
                     try {
                         jsonString = mapper.writeValueAsString(clientMessage);

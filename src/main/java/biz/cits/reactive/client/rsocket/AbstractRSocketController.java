@@ -2,6 +2,7 @@ package biz.cits.reactive.client.rsocket;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.http.MediaType;
 import org.springframework.messaging.rsocket.RSocketRequester;
@@ -18,7 +19,7 @@ public abstract class AbstractRSocketController<T> {
 
     private final RSocketRequester rSocketRequester;
 
-    ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    private ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule()).configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
 
 
     public AbstractRSocketController(T t, RSocketRequester rSocketRequester) {
