@@ -4,6 +4,7 @@ import biz.cits.reactive.model.ClientMessage;
 import biz.cits.reactive.model.Message;
 import biz.cits.reactive.model.MsgGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -130,7 +131,19 @@ public class RSocketController {
         return rSocketRequester
                 .route("posts/me")
                 .data(messages)
-                .retrieveFlux(String.class);
+                .retrieveFlux(String.class).map(this::checkResult);
+    }
+
+    private String checkResult(String m) {
+        try {
+            JsonNode json = mapper.readTree(m);
+            if (json.has("error")) {
+                throw new RuntimeException(json.get("error").asText());
+            }
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+        return m;
     }
 
 
