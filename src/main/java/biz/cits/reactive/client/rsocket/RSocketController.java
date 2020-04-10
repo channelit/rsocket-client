@@ -36,10 +36,11 @@ public class RSocketController {
 
     @GetMapping(value = "/messages/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Publisher<String> getMessages(@PathVariable String filter) {
-        return rSocketRequester
+        Flux<String> requester = rSocketRequester
                 .route("messages/" + filter)
                 .data(filter)
                 .retrieveFlux(String.class);
+        return requester;
     }
 
     @GetMapping(value = "/camel/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
