@@ -15,6 +15,7 @@
     </parent>
     <properties>
         <camel.version>3.0.1</camel.version>
+        <rsocket.version>1.0.0-RC6</rsocket.version>
     </properties>
     <dependencies>
         <dependency>
@@ -51,15 +52,27 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/io.rsocket/rsocket-core -->
         <dependency>
             <groupId>io.rsocket</groupId>
             <artifactId>rsocket-core</artifactId>
-            <version>1.0.0-RC6</version>
+            <version>${rsocket.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.rsocket</groupId>
+            <artifactId>rsocket-core</artifactId>
+            <version>${rsocket.version}</version>
         </dependency>
         <dependency>
             <groupId>io.rsocket</groupId>
             <artifactId>rsocket-transport-netty</artifactId>
-            <version>1.0.0-RC6</version>
+            <version>${rsocket.version}</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/io.rsocket/rsocket-transport-local -->
+        <dependency>
+            <groupId>io.rsocket</groupId>
+            <artifactId>rsocket-transport-local</artifactId>
+            <version>${rsocket.version}</version>
         </dependency>
     </dependencies>
     <build>
