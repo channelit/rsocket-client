@@ -68,12 +68,7 @@
             <artifactId>rsocket-transport-netty</artifactId>
             <version>${rsocket.version}</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/io.rsocket/rsocket-transport-local -->
-        <dependency>
-            <groupId>io.rsocket</groupId>
-            <artifactId>rsocket-transport-local</artifactId>
-            <version>${rsocket.version}</version>
-        </dependency>
+
     </dependencies>
     <build>
         <plugins>
