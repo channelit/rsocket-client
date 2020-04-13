@@ -46,11 +46,11 @@ public class RSocketTest {
                 .start()
                 .block();
 
-        socket.requestChannel(Flux.just("ABCDE", "ABCDE", "ABCDE").map(s-> DefaultPayload.create(s, "socket")))
+        socket.requestChannel(Flux.just("ABCDE", "ABCDE", "ABCDE").map(s-> DefaultPayload.create(s)))
                 .map(Payload::getDataUtf8)
                 .doOnNext(System.out::println)
                 .blockLast();
 
-        socket.dispose();
+//        socket.dispose();
     }
 }

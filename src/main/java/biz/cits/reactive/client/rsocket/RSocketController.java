@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
 import io.rsocket.Payload;
@@ -19,11 +20,14 @@ import io.rsocket.frame.decoder.PayloadDecoder;
 import io.rsocket.metadata.WellKnownMimeType;
 import io.rsocket.plugins.DuplexConnectionInterceptor;
 import io.rsocket.transport.netty.client.TcpClientTransport;
+import io.rsocket.util.ByteBufPayload;
 import io.rsocket.util.DefaultPayload;
 import org.reactivestreams.Publisher;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.io.buffer.NettyDataBufferFactory;
 import org.springframework.http.MediaType;
 import org.springframework.messaging.rsocket.RSocketRequester;
+import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -50,27 +54,22 @@ public class RSocketController {
         this.rSocketRequester = rSocketRequester;
         this.client = RSocketFactory
                 .connect()
-//                .keepAlive()
-                .mimeType(WellKnownMimeType.MESSAGE_RSOCKET_ROUTING.toString(), WellKnownMimeType.APPLICATION_JSON.toString())
                 .frameDecoder(PayloadDecoder.ZERO_COPY)
+                .mimeType(WellKnownMimeType.MESSAGE_RSOCKET_ROUTING.toString(), WellKnownMimeType.APPLICATION_CBOR.toString())
                 .transport(TcpClientTransport.create("localhost", 7000))
                 .start()
                 .block();
     }
 
-    @GetMapping(value = "/socket", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Publisher<String> socket() {
-        ByteBuf metadata = Unpooled.buffer();
-        metadata.writeByte(0);
-        metadata.writeCharSequence("socket", CharsetUtil.UTF_8);
-        System.out.println(metadata.toString());
-        ByteBuf stuff = Unpooled.buffer();
-        stuff.writeByte(0);
-        stuff.writeCharSequence("{'filter':'ABCDE'}", CharsetUtil.UTF_8);
-        ObjectNode response = mapper.createObjectNode();
-        response.put("message", "ABCDE");
-        Flux<String> s = client.requestStream(DefaultPayload.create(response.asText())).map(r->r.getDataUtf8());
-        return s;
+    @GetMapping(value = "/socket/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Publisher<String> socket(@PathVariable String filter) {
+        ObjectNode message = mapper.createObjectNode();
+        message.put("route", "messages");
+        message.put("client", "me");
+        message.put("filter", filter);
+        message.put("data", filter);
+        Flux<Payload> s = client.requestStream(DefaultPayload.create(message.toString(),"messages.abcde" + filter));
+        return s.map(Payload::getDataUtf8);
     }
 
 
