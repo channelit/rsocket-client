@@ -30,8 +30,8 @@ public class RSocketConfig {
     RSocket rSocket() {
         return RSocketFactory
                 .connect()
-                .mimeType(WellKnownMimeType.MESSAGE_RSOCKET_ROUTING.toString(), String.valueOf(MediaType.APPLICATION_CBOR))
                 .frameDecoder(PayloadDecoder.ZERO_COPY)
+                .mimeType(WellKnownMimeType.MESSAGE_RSOCKET_ROUTING.toString(), WellKnownMimeType.APPLICATION_CBOR.toString())
                 .transport(TcpClientTransport.create("localhost", 7000))
                 .start()
                 .block();

@@ -38,18 +38,10 @@ public class RSocketController {
     private final RSocket rSocket;
     private final RSocketRequester rSocketRequester;
     private ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule()).configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
-    private final RSocket client;
 
     public RSocketController(RSocket rSocket, RSocketRequester rSocketRequester) {
         this.rSocket = rSocket;
         this.rSocketRequester = rSocketRequester;
-        this.client = RSocketFactory
-                .connect()
-                .frameDecoder(PayloadDecoder.ZERO_COPY)
-                .mimeType(WellKnownMimeType.MESSAGE_RSOCKET_ROUTING.toString(), WellKnownMimeType.APPLICATION_CBOR.toString())
-                .transport(TcpClientTransport.create("localhost", 7000))
-                .start()
-                .block();
     }
 
     @GetMapping(value = "/socket/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -59,7 +51,7 @@ public class RSocketController {
         message.put("client", "me");
         message.put("filter", filter);
         message.put("data", filter);
-        Flux<Payload> s = client.requestStream(DefaultPayload.create(message.toString(),"messages.abcde" + filter));
+        Flux<Payload> s = rSocket.requestStream(DefaultPayload.create(message.toString(),"messages.abcde" + filter));
         return s.map(Payload::getDataUtf8);
     }
 
