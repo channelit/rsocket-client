@@ -71,13 +71,16 @@ public class RSocketController {
                 .block();
     }
 
-    @GetMapping(value = "/socket/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Publisher<String> socket(@PathVariable String filter) {
+    @GetMapping(value = "/socket/{route}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Publisher<String> socket(@PathVariable String route) {
+
+        String filter = "ABCDE";
+        String data = "select message FROM messages WHERE (message->>'messageDateTime')::timestamp with time zone > '2020-04-27 09:19:58.89'::timestamp without time zone";
         ObjectNode message = mapper.createObjectNode();
-        message.put("route", "messages");
+        message.put("route", route);
         message.put("client", "me");
         message.put("filter", filter);
-        message.put("data", filter);
+        message.put("data", data);
 //        System.out.println(rSocket.availability());
 //        if (rSocket.availability() < 1.0) {
 //            rSocket.dispose();
@@ -138,8 +141,8 @@ public class RSocketController {
 
     @GetMapping(value = "/replay/{client}/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Publisher<String> replay(@PathVariable String client, @PathVariable String filter) {
-//        String query = "select message FROM messages WHERE (message->>'messageDateTime')::timestamp with time zone > '2020-04-27 09:19:58.89'::timestamp without time zone";
-        String query = "select message FROM messages";
+        String query = "select message FROM messages WHERE (message->>'messageDateTime')::timestamp with time zone > '2020-04-27 09:19:58.89'::timestamp without time zone";
+//        String query = "select message FROM messages";
         return rSocketRequester
                 .route("replay/" + client + "/" + filter)
                 .data(query)
