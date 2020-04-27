@@ -136,11 +136,12 @@ public class RSocketController {
                 .retrieveFlux(String.class);
     }
 
-    @GetMapping(value = "/replay/{client}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Publisher<String> replay(@PathVariable String client) {
-        String query = "select message FROM messages WHERE (message->>'messageDateTime')::timestamp with time zone > '2020-04-27 09:19:58.89'::timestamp without time zone";
+    @GetMapping(value = "/replay/{client}/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Publisher<String> replay(@PathVariable String client, @PathVariable String filter) {
+//        String query = "select message FROM messages WHERE (message->>'messageDateTime')::timestamp with time zone > '2020-04-27 09:19:58.89'::timestamp without time zone";
+        String query = "select message FROM messages";
         return rSocketRequester
-                .route("replay/" + client)
+                .route("replay/" + client + "/" + filter)
                 .data(query)
                 .retrieveFlux(String.class);
     }
