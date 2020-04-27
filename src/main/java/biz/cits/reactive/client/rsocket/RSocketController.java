@@ -12,8 +12,12 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.rsocket.Payload;
 import io.rsocket.RSocket;
 import io.rsocket.RSocketFactory;
+import io.rsocket.exceptions.RejectedResumeException;
 import io.rsocket.frame.decoder.PayloadDecoder;
+import io.rsocket.keepalive.KeepAliveHandler;
 import io.rsocket.metadata.WellKnownMimeType;
+import io.rsocket.resume.PeriodicResumeStrategy;
+import io.rsocket.resume.ResumableDuplexConnection;
 import io.rsocket.transport.netty.client.TcpClientTransport;
 import io.rsocket.util.DefaultPayload;
 import org.reactivestreams.Publisher;
@@ -27,6 +31,8 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.nio.channels.ClosedChannelException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -35,13 +41,34 @@ import java.util.UUID;
 @Order(1)
 public class RSocketController {
 
-    private final RSocket rSocket;
+    private RSocket rSocket;
     private final RSocketRequester rSocketRequester;
     private ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule()).configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
 
     public RSocketController(RSocket rSocket, RSocketRequester rSocketRequester) {
-        this.rSocket = rSocket;
+        init();
         this.rSocketRequester = rSocketRequester;
+    }
+
+    private void init() {
+        this.rSocket = RSocketFactory
+                .connect()
+                .errorConsumer(throwable -> {
+                    if (throwable instanceof ClosedChannelException) {
+                        init();
+                        throwable.printStackTrace();
+                    }
+                })
+                .resume()
+                .keepAliveTickPeriod(Duration.ofSeconds(1))
+                .resumeSessionDuration(Duration.ofHours(2))
+                .resumeStreamTimeout(Duration.ofHours(5))
+                .frameDecoder(PayloadDecoder.ZERO_COPY)
+                .mimeType(WellKnownMimeType.MESSAGE_RSOCKET_ROUTING.toString(), WellKnownMimeType.APPLICATION_CBOR.toString())
+                .transport(TcpClientTransport.create("localhost", 7000))
+                .start()
+                .retryBackoff(Integer.MAX_VALUE, Duration.ofSeconds(1))
+                .block();
     }
 
     @GetMapping(value = "/socket/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -51,7 +78,11 @@ public class RSocketController {
         message.put("client", "me");
         message.put("filter", filter);
         message.put("data", filter);
-        Flux<Payload> s = rSocket.requestStream(DefaultPayload.create(message.toString(),"messages.abcde" + filter));
+//        System.out.println(rSocket.availability());
+//        if (rSocket.availability() < 1.0) {
+//            rSocket.dispose();
+//        }
+        Flux<Payload> s = rSocket.requestStream(DefaultPayload.create(message.toString()));
         return s.map(Payload::getDataUtf8);
     }
 
@@ -107,9 +138,10 @@ public class RSocketController {
 
     @GetMapping(value = "/replay/{client}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Publisher<String> replay(@PathVariable String client) {
+        String query = "select message FROM messages WHERE (message->>'messageDateTime')::timestamp with time zone > '2020-04-27 09:19:58.89'::timestamp without time zone";
         return rSocketRequester
                 .route("replay/" + client)
-                .data(client)
+                .data(query)
                 .retrieveFlux(String.class);
     }
 
