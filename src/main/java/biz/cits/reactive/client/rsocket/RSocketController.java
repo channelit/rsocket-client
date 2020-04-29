@@ -13,11 +13,13 @@ import io.rsocket.Payload;
 import io.rsocket.RSocket;
 import io.rsocket.core.RSocketConnector;
 import io.rsocket.core.Resume;
+import io.rsocket.exceptions.RejectedResumeException;
 import io.rsocket.frame.decoder.PayloadDecoder;
 import io.rsocket.resume.InMemoryResumableFramesStore;
 import io.rsocket.transport.netty.client.TcpClientTransport;
 import io.rsocket.util.DefaultPayload;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -31,6 +33,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
+import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -40,7 +43,7 @@ import java.util.UUID;
 @Order(1)
 public class RSocketController {
 
-    private RSocket rSocket;
+    private Mono<RSocket> rSocket;
     private final RSocketRequester rSocketRequester;
     private ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule()).configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
 
@@ -57,17 +60,22 @@ public class RSocketController {
                         .sessionDuration(Duration.ofSeconds(1))
                         .storeFactory(t -> new InMemoryResumableFramesStore("client", 500_000))
                         .cleanupStoreOnKeepAlive()
-                        .retry(Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(1))
+                        .retry(Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(5))
                                 .doBeforeRetry(
-                                        retrySignal ->
-                                                System.out.println("Disconnected. Trying to resume connection...")));
+                                        retrySignal -> {
+                                            System.out.println("Disconnected. Trying to resume connection...");
+                                        })
+                                .doAfterRetry(
+                                        retrySignal -> {
+                                            System.out.println("Tried to resume connection...");
+                                        })
+                        );
 
         this.rSocket =
                 RSocketConnector.create()
-                        .resume(resume)
+//                        .resume(resume)
                         .payloadDecoder(PayloadDecoder.ZERO_COPY)
-                        .connect(TcpClientTransport.create("localhost", 7000))
-                        .block();
+                        .connect(TcpClientTransport.create("localhost", 7000));
 
 //        this.rSocket = RSocketConnector.
 //                .connect()
@@ -92,7 +100,6 @@ public class RSocketController {
 
     @GetMapping(value = "/socket/{route}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Publisher<String> socket(@PathVariable String route) {
-
         String filter = "ABCDE";
         String data = "select message FROM messages WHERE (message->>'messageDateTime')::timestamp with time zone > '2020-04-27 09:19:58.89'::timestamp without time zone";
         ObjectNode message = mapper.createObjectNode();
@@ -104,10 +111,21 @@ public class RSocketController {
 //        if (rSocket.availability() < 1.0) {
 //            rSocket.dispose();
 //        }
-        Flux<Payload> s = rSocket.requestStream(DefaultPayload.create(message.toString()));
+//        Flux<Payload> s = rSocket.requestStream(DefaultPayload.create(message.toString()));
+
+        Flux<Payload> s = rSocket.flatMapMany(requester ->
+                requester.requestStream(DefaultPayload.create(message.toString()))
+        ).doOnError(this::handleConnectionError).retry();
         return s.map(Payload::getDataUtf8);
     }
 
+    private synchronized void handleConnectionError(Throwable throwable) {
+        if (throwable instanceof ClosedChannelException) {
+            init();
+            System.out.println("Closed Channel Exception Occurred In Subscriber");
+//            throwable.printStackTrace();
+        }
+    }
 
     @GetMapping(value = "/messages/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Publisher<String> getMessages(@PathVariable String filter) {
