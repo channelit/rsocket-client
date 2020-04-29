@@ -77,25 +77,6 @@ public class RSocketController {
                         .payloadDecoder(PayloadDecoder.ZERO_COPY)
                         .connect(TcpClientTransport.create("localhost", 7000));
 
-//        this.rSocket = RSocketConnector.
-//                .connect()
-//                .errorConsumer(throwable -> {
-//                    if (throwable instanceof ClosedChannelException) {
-//                        init();
-//                        throwable.printStackTrace();
-//                    }
-//                });
-//
-//                .resume()
-//                .keepAliveTickPeriod(Duration.ofSeconds(1))
-//                .resumeSessionDuration(Duration.ofHours(2))
-//                .resumeStreamTimeout(Duration.ofHours(5))
-//                .frameDecoder(PayloadDecoder.ZERO_COPY)
-//                .mimeType(WellKnownMimeType.MESSAGE_RSOCKET_ROUTING.toString(), WellKnownMimeType.APPLICATION_CBOR.toString())
-//                .transport(TcpClientTransport.create("localhost", 7000))
-//                .start()
-//                .retryBackoff(Integer.MAX_VALUE, Duration.ofSeconds(1))
-//                .block();
     }
 
     @GetMapping(value = "/socket/{route}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -107,11 +88,6 @@ public class RSocketController {
         message.put("client", "me");
         message.put("filter", filter);
         message.put("data", data);
-//        System.out.println(rSocket.availability());
-//        if (rSocket.availability() < 1.0) {
-//            rSocket.dispose();
-//        }
-//        Flux<Payload> s = rSocket.requestStream(DefaultPayload.create(message.toString()));
 
         Flux<Payload> s = rSocket.flatMapMany(requester ->
                 requester.requestStream(DefaultPayload.create(message.toString()))
@@ -123,7 +99,6 @@ public class RSocketController {
         if (throwable instanceof ClosedChannelException) {
             init();
             System.out.println("Closed Channel Exception Occurred In Subscriber");
-//            throwable.printStackTrace();
         }
     }
 
