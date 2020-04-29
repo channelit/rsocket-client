@@ -11,12 +11,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.rsocket.Payload;
 import io.rsocket.RSocket;
-import io.rsocket.RSocketFactory;
 import io.rsocket.core.RSocketConnector;
 import io.rsocket.core.Resume;
 import io.rsocket.frame.decoder.PayloadDecoder;
-import io.rsocket.metadata.WellKnownMimeType;
-import io.rsocket.resume.ResumableDuplexConnection;
+import io.rsocket.resume.InMemoryResumableFramesStore;
 import io.rsocket.transport.netty.client.TcpClientTransport;
 import io.rsocket.util.DefaultPayload;
 import org.reactivestreams.Publisher;
@@ -33,7 +31,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
-import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -57,18 +54,19 @@ public class RSocketController {
     private void init() {
         Resume resume =
                 new Resume()
-                        .sessionDuration(Duration.ofMinutes(50))
-                        .retry(
-                                Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(1))
-                                        .doBeforeRetry(
-                                                retrySignal ->
-                                                        logger.debug("Disconnected. Trying to resume connection...")));
+                        .sessionDuration(Duration.ofSeconds(1))
+                        .storeFactory(t -> new InMemoryResumableFramesStore("client", 500_000))
+                        .cleanupStoreOnKeepAlive()
+                        .retry(Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(1))
+                                .doBeforeRetry(
+                                        retrySignal ->
+                                                System.out.println("Disconnected. Trying to resume connection...")));
 
         this.rSocket =
                 RSocketConnector.create()
                         .resume(resume)
                         .payloadDecoder(PayloadDecoder.ZERO_COPY)
-                        .connect(TcpClientTransport.create("localhost", 7002))
+                        .connect(TcpClientTransport.create("localhost", 7000))
                         .block();
 
 //        this.rSocket = RSocketConnector.
