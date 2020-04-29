@@ -12,15 +12,16 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.rsocket.Payload;
 import io.rsocket.RSocket;
 import io.rsocket.RSocketFactory;
-import io.rsocket.exceptions.RejectedResumeException;
+import io.rsocket.core.RSocketConnector;
+import io.rsocket.core.Resume;
 import io.rsocket.frame.decoder.PayloadDecoder;
-import io.rsocket.keepalive.KeepAliveHandler;
 import io.rsocket.metadata.WellKnownMimeType;
-import io.rsocket.resume.PeriodicResumeStrategy;
 import io.rsocket.resume.ResumableDuplexConnection;
 import io.rsocket.transport.netty.client.TcpClientTransport;
 import io.rsocket.util.DefaultPayload;
 import org.reactivestreams.Publisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.messaging.rsocket.RSocketRequester;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
@@ -45,30 +47,49 @@ public class RSocketController {
     private final RSocketRequester rSocketRequester;
     private ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule()).configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
 
+    Logger logger = LoggerFactory.getLogger(RSocketController.class);
+
     public RSocketController(RSocket rSocket, RSocketRequester rSocketRequester) {
         init();
         this.rSocketRequester = rSocketRequester;
     }
 
     private void init() {
-        this.rSocket = RSocketFactory
-                .connect()
-                .errorConsumer(throwable -> {
-                    if (throwable instanceof ClosedChannelException) {
-                        init();
-                        throwable.printStackTrace();
-                    }
-                })
-                .resume()
-                .keepAliveTickPeriod(Duration.ofSeconds(1))
-                .resumeSessionDuration(Duration.ofHours(2))
-                .resumeStreamTimeout(Duration.ofHours(5))
-                .frameDecoder(PayloadDecoder.ZERO_COPY)
-                .mimeType(WellKnownMimeType.MESSAGE_RSOCKET_ROUTING.toString(), WellKnownMimeType.APPLICATION_CBOR.toString())
-                .transport(TcpClientTransport.create("localhost", 7000))
-                .start()
-                .retryBackoff(Integer.MAX_VALUE, Duration.ofSeconds(1))
-                .block();
+        Resume resume =
+                new Resume()
+                        .sessionDuration(Duration.ofMinutes(50))
+                        .retry(
+                                Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(1))
+                                        .doBeforeRetry(
+                                                retrySignal ->
+                                                        logger.debug("Disconnected. Trying to resume connection...")));
+
+        this.rSocket =
+                RSocketConnector.create()
+                        .resume(resume)
+                        .payloadDecoder(PayloadDecoder.ZERO_COPY)
+                        .connect(TcpClientTransport.create("localhost", 7002))
+                        .block();
+
+//        this.rSocket = RSocketConnector.
+//                .connect()
+//                .errorConsumer(throwable -> {
+//                    if (throwable instanceof ClosedChannelException) {
+//                        init();
+//                        throwable.printStackTrace();
+//                    }
+//                });
+//
+//                .resume()
+//                .keepAliveTickPeriod(Duration.ofSeconds(1))
+//                .resumeSessionDuration(Duration.ofHours(2))
+//                .resumeStreamTimeout(Duration.ofHours(5))
+//                .frameDecoder(PayloadDecoder.ZERO_COPY)
+//                .mimeType(WellKnownMimeType.MESSAGE_RSOCKET_ROUTING.toString(), WellKnownMimeType.APPLICATION_CBOR.toString())
+//                .transport(TcpClientTransport.create("localhost", 7000))
+//                .start()
+//                .retryBackoff(Integer.MAX_VALUE, Duration.ofSeconds(1))
+//                .block();
     }
 
     @GetMapping(value = "/socket/{route}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
