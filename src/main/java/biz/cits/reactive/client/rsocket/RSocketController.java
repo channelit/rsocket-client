@@ -83,6 +83,7 @@ public class RSocketController {
     public Publisher<String> socket(@PathVariable String route) {
         String filter = "ABCDE";
         String data = "select message FROM messages WHERE (message->>'messageDateTime')::timestamp with time zone > '2020-04-27 09:19:58.89'::timestamp without time zone";
+        data = "{'id':'id'}";
         ObjectNode message = mapper.createObjectNode();
         message.put("route", route);
         message.put("client", "me");
