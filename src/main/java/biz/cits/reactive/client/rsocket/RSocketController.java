@@ -13,13 +13,13 @@ import io.rsocket.Payload;
 import io.rsocket.RSocket;
 import io.rsocket.core.RSocketConnector;
 import io.rsocket.core.Resume;
-import io.rsocket.exceptions.RejectedResumeException;
 import io.rsocket.frame.decoder.PayloadDecoder;
+import io.rsocket.metadata.CompositeMetadata;
+import io.rsocket.metadata.WellKnownMimeType;
 import io.rsocket.resume.InMemoryResumableFramesStore;
 import io.rsocket.transport.netty.client.TcpClientTransport;
 import io.rsocket.util.DefaultPayload;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -73,8 +73,11 @@ public class RSocketController {
 
         this.rSocket =
                 RSocketConnector.create()
-//                        .resume(resume)
+                        .resume(resume)
+                        .keepAlive(Duration.ofMillis(100), Duration.ofDays(100))
                         .payloadDecoder(PayloadDecoder.ZERO_COPY)
+                        .dataMimeType(WellKnownMimeType.APPLICATION_CBOR.toString())
+                        .metadataMimeType(WellKnownMimeType.MESSAGE_RSOCKET_COMPOSITE_METADATA.getString())
                         .connect(TcpClientTransport.create("localhost", 7000));
 
     }
@@ -91,7 +94,7 @@ public class RSocketController {
         message.put("data", data);
 
         Flux<Payload> s = rSocket.flatMapMany(requester ->
-                requester.requestStream(DefaultPayload.create(message.toString()))
+                requester.requestStream(DefaultPayload.create(message.toString(), "camel-virtual/me/ABCDE"))
         ).doOnError(this::handleConnectionError).retry();
         return s.map(Payload::getDataUtf8);
     }
