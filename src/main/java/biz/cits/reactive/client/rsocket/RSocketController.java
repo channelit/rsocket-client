@@ -1,5 +1,6 @@
 package biz.cits.reactive.client.rsocket;
 
+import autovalue.shaded.com.google$.common.collect.$TreeRangeSet;
 import biz.cits.reactive.model.ClientMessage;
 import biz.cits.reactive.model.Message;
 import biz.cits.reactive.model.MsgGenerator;
@@ -14,7 +15,6 @@ import io.rsocket.RSocket;
 import io.rsocket.core.RSocketConnector;
 import io.rsocket.core.Resume;
 import io.rsocket.frame.decoder.PayloadDecoder;
-import io.rsocket.metadata.CompositeMetadata;
 import io.rsocket.metadata.WellKnownMimeType;
 import io.rsocket.resume.InMemoryResumableFramesStore;
 import io.rsocket.transport.netty.client.TcpClientTransport;
@@ -29,8 +29,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.BufferOverflowStrategy;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 import reactor.util.retry.Retry;
 
 import java.nio.channels.ClosedChannelException;
@@ -38,6 +41,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @Order(1)
@@ -48,19 +53,49 @@ public class RSocketController {
     private ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule()).configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
 
     Logger logger = LoggerFactory.getLogger(RSocketController.class);
+    private Scheduler s;
 
-    public RSocketController(RSocket rSocket, RSocketRequester rSocketRequester) {
+    public RSocketController(RSocket rSocket, RSocketRequester rSocketRequester) throws InterruptedException {
+        s = Schedulers.newSingle("inspect");
+        s.schedulePeriodically(this::inspect, 0, 5, TimeUnit.SECONDS);
+        s.start();
         init();
         this.rSocketRequester = rSocketRequester;
+//        String filter = "ABCDE";
+//        String data = "select message FROM messages WHERE (message->>'messageDateTime')::timestamp with time zone > '2020-04-27 09:19:58.89'::timestamp without time zone";
+//        long i = 0;
+//        RSocket mySocket = this.rSocket.block();
+//        while (i < 16000) {
+//            i++;
+//            data = "{\"id\":\"" + UUID.randomUUID().toString() + "\"}";
+//            ObjectNode message = mapper.createObjectNode();
+//            message.put("route", "post");
+//            message.put("client", "me");
+//            message.put("filter", filter);
+//            message.put("data", data);
+//            System.out.println(i);
+//            mySocket.requestStream(DefaultPayload.create(message.toString()).touch()).retry(5).subscribe();
+//        }
+    }
+
+    private void inspect() {
+        ObjectNode message = mapper.createObjectNode();
+        message.put("route", "inspect");
+        message.put("client", "me");
+        message.put("filter", "");
+        message.put("data", "");
+        Flux<Payload> s = rSocket.flatMapMany(requester ->
+                requester.requestStream(DefaultPayload.create(message.toString())));
+        s.map(this::logThread).map(Payload::getDataUtf8).subscribe(msg-> logger.info(msg));
     }
 
     private void init() {
         Resume resume =
                 new Resume()
-                        .sessionDuration(Duration.ofSeconds(1))
-                        .storeFactory(t -> new InMemoryResumableFramesStore("client", 500_000))
+                        .sessionDuration(Duration.ofSeconds(1000))
+                        .storeFactory(t -> new InMemoryResumableFramesStore("client", 500_000_000))
                         .cleanupStoreOnKeepAlive()
-                        .retry(Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(5))
+                        .retry(Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(1))
                                 .doBeforeRetry(
                                         retrySignal -> {
                                             System.out.println("Disconnected. Trying to resume connection...");
@@ -71,32 +106,64 @@ public class RSocketController {
                                         })
                         );
 
+        logger.info("Reconnecting");
+        System.out.println("Reconnecting on Thread --------->      " + Thread.currentThread().getName());
         this.rSocket =
                 RSocketConnector.create()
+                        .reconnect(Retry.fixedDelay(100, Duration.ofSeconds(5)))
                         .resume(resume)
-                        .keepAlive(Duration.ofMillis(100), Duration.ofDays(100))
+                        .keepAlive(Duration.ofSeconds(1),Duration.ofHours(100))
                         .payloadDecoder(PayloadDecoder.ZERO_COPY)
                         .dataMimeType(WellKnownMimeType.APPLICATION_CBOR.toString())
-                        .metadataMimeType(WellKnownMimeType.MESSAGE_RSOCKET_COMPOSITE_METADATA.getString())
+                        .metadataMimeType(WellKnownMimeType.APPLICATION_CBOR.getString())
                         .connect(TcpClientTransport.create("localhost", 7000));
-
     }
 
     @GetMapping(value = "/socket/{route}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Publisher<String> socket(@PathVariable String route) {
         String filter = "ABCDE";
         String data = "select message FROM messages WHERE (message->>'messageDateTime')::timestamp with time zone > '2020-04-27 09:19:58.89'::timestamp without time zone";
-        data = "{'id':'id'}";
+        data = "{\"id\":'id'}";
         ObjectNode message = mapper.createObjectNode();
         message.put("route", route);
         message.put("client", "me");
         message.put("filter", filter);
         message.put("data", data);
-
         Flux<Payload> s = rSocket.flatMapMany(requester ->
-                requester.requestStream(DefaultPayload.create(message.toString(), "camel-virtual/me/ABCDE"))
+                requester.requestStream(DefaultPayload.create(message.toString()))
         ).doOnError(this::handleConnectionError).retry();
-        return s.map(Payload::getDataUtf8);
+        return s.map(this::logThread).map(Payload::getDataUtf8);
+    }
+
+    @GetMapping(value = "/socket/bulk-post", produces = MediaType.TEXT_PLAIN_VALUE)
+    public Publisher<String> socketBulkPost() {
+        String filter = "ABCDE";
+        String data = "select message FROM messages WHERE (message->>'messageDateTime')::timestamp with time zone > '2020-04-27 09:19:58.89'::timestamp without time zone";
+        long i = 0;
+        while (i < 3000) {
+            i++;
+            data = "{\"id\":\"" + UUID.randomUUID().toString() + "\"}";
+            ObjectNode message = mapper.createObjectNode();
+            message.put("route", "post");
+            message.put("client", "me");
+            message.put("filter", filter);
+            message.put("data", data);
+
+            System.out.println(i);
+
+            Flux<Payload> s = rSocket.flatMapMany(requester ->
+                    requester.requestStream(DefaultPayload.create(message.toString()))
+            ).doOnError(this::handleConnectionError).retry();
+
+            s.subscribe();
+//            rSocketPublisher.requestStream(DefaultPayload.create(message.toString())).doOnError(this::handleConnectionError).retry().subscribe();
+        }
+        return Flux.just("ok");
+    }
+
+    private Payload logThread(Payload payload) {
+        System.out.println("Message received on Thread --------->      " + Thread.currentThread().getName());
+        return payload;
     }
 
     private synchronized void handleConnectionError(Throwable throwable) {
