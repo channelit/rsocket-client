@@ -88,7 +88,7 @@ public class RSocketController {
 //            System.out.println(i);
 //            mySocket.requestStream(DefaultPayload.create(message.toString())).doOnError(this::handleConnectionError).retry().subscribe();
 //        }
-        
+
         this.metadataPost = getRouteMetadata("post/me");
         this.metadataPosts = getRouteMetadata("posts/me");
 
@@ -103,6 +103,7 @@ public class RSocketController {
                 routingMetadata.getContent());
         return metadata;
     }
+
     private void inspect() {
         ObjectNode message = mapper.createObjectNode();
         message.put("route", "inspect");
@@ -111,7 +112,7 @@ public class RSocketController {
         message.put("data", "");
         Flux<Payload> s = rSocket.flatMapMany(requester ->
                 requester.requestStream(DefaultPayload.create(message.toString()))).doOnError(this::handleConnectionError).retry(1);
-        s.map(this::logThread).map(Payload::getDataUtf8).subscribe(msg-> logger.info(msg));
+        s.map(this::logThread).map(Payload::getDataUtf8).subscribe(msg -> logger.info(msg));
     }
 
     private void init() {
@@ -137,7 +138,7 @@ public class RSocketController {
                 RSocketConnector.create()
                         .reconnect(Retry.fixedDelay(100, Duration.ofSeconds(5)))
                         .resume(resume)
-                        .keepAlive(Duration.ofSeconds(1),Duration.ofDays(2))
+                        .keepAlive(Duration.ofSeconds(1), Duration.ofDays(2))
                         .payloadDecoder(PayloadDecoder.ZERO_COPY)
                         .dataMimeType(WellKnownMimeType.APPLICATION_CBOR.toString())
                         .metadataMimeType(WellKnownMimeType.MESSAGE_RSOCKET_COMPOSITE_METADATA.getString())
@@ -201,19 +202,13 @@ public class RSocketController {
             data = "{\"id\":\"" + UUID.randomUUID().toString() + "\"}";
             messages.add(data);
             System.out.println(i);
-
-            if (i % 1000 == 0) {
-                Flux<Payload> payloads = Flux.create(payloadFluxSink -> {
-                    messages.forEach(
-                            message -> payloadFluxSink.next(DefaultPayload.create(ByteBufAllocator.DEFAULT.buffer().writeBytes(message.getBytes()), metadataPosts))
-                    );
-                });
-                Flux<Payload> s = rSocket.flatMapMany(requester ->
-                        requester.requestChannel(payloads)
-                ).doOnError(this::handleConnectionError).retry(1).log();
-                s.map(Payload::getDataUtf8).map(this::checkResult).subscribe(System.out::println);
-            }
         }
+        List<String> finalMessages = messages;
+        Flux<Payload> payloads = Flux.fromStream(messages.parallelStream()).map(message->DefaultPayload.create(ByteBufAllocator.DEFAULT.buffer().writeBytes(message.getBytes()), metadataPosts));
+        Flux<Payload> s = rSocket.flatMapMany(requester ->
+                requester.requestChannel(payloads.delayElements(Duration.ofMillis(50)))
+        ).doOnError(this::handleConnectionError).retry(1).log();
+        s.map(Payload::getDataUtf8).map(this::checkResult).subscribe(System.out::println);
         return Flux.just("ok");
     }
 
@@ -268,7 +263,7 @@ public class RSocketController {
     @GetMapping(value = "/camel-virtual/{client}/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Publisher<String> getCamelVirtualMessages(@PathVariable String client, @PathVariable String filter) {
         return rSocketRequester
-                .route("camel-virtual/" + client + "/" + filter)
+                .route("camel-virtual/" + client + "/" + filter + "/" + UUID.randomUUID())
                 .data(filter)
                 .retrieveFlux(String.class);
     }
@@ -331,7 +326,7 @@ public class RSocketController {
                 }));
         return rSocketRequester
                 .route("posts/me")
-                .data(messages)
+                .data(messages.delayElements(Duration.ofMillis(15)))
                 .retrieveFlux(String.class).map(this::checkResult);
     }
 
