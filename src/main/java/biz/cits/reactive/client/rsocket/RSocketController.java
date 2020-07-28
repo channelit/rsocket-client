@@ -53,6 +53,7 @@ import java.util.concurrent.TimeUnit;
 public class RSocketController {
 
     private final CompositeByteBuf metadataPosts;
+    private final CompositeByteBuf metadataSubscribe;
     private Mono<RSocket> rSocket;
     private RSocket rSocketPublisher;
     private final RSocketRequester rSocketRequester;
@@ -68,7 +69,6 @@ public class RSocketController {
         s.start();
         init();
         this.rSocketRequester = rSocketRequester;
-        String filter = "ABCDE";
         String data = "select message FROM messages WHERE (message->>'messageDateTime')::timestamp with time zone > '2020-04-27 09:19:58.89'::timestamp without time zone";
         long i = 0;
 //        RSocket mySocket = RSocketConnector.create()
@@ -91,6 +91,7 @@ public class RSocketController {
 
         this.metadataPost = getRouteMetadata("post/me");
         this.metadataPosts = getRouteMetadata("posts/me");
+        this.metadataSubscribe = getRouteMetadata("subscribe/me/" + UUID.randomUUID());
 
     }
 
@@ -118,7 +119,8 @@ public class RSocketController {
     private void init() {
         Resume resume =
                 new Resume()
-                        .sessionDuration(Duration.ofDays(10))
+                        .streamTimeout(Duration.ofSeconds(1))
+                        .sessionDuration(Duration.ofSeconds(100))
                         .storeFactory(t -> new InMemoryResumableFramesStore("client", 500_000))
                         .cleanupStoreOnKeepAlive()
                         .retry(Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(5))
@@ -160,6 +162,14 @@ public class RSocketController {
         message.put("data", data);
         Flux<Payload> s = rSocket.flatMapMany(requester ->
                 requester.requestStream(DefaultPayload.create(message.toString()))
+        ).doOnError(this::handleConnectionError).retry();
+        return s.map(Payload::getDataUtf8);
+    }
+
+    @GetMapping(value = "/subscribe/{filter}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Publisher<String> subscribe(@PathVariable String filter) {
+        Flux<Payload> s = rSocket.flatMapMany(requester ->
+                requester.requestStream(DefaultPayload.create(ByteBufAllocator.DEFAULT.buffer().writeBytes(filter.getBytes()), metadataSubscribe))
         ).doOnError(this::handleConnectionError).retry(1);
         return s.map(Payload::getDataUtf8);
     }
